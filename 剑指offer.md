@@ -307,3 +307,255 @@ g.ancestor = c
 c.ancestor = a
 b.ancestor = a
 ```
+## NO7 栈和队列的相互实现
+用两个栈可以实现队列，由两个队列也可以实现一个栈。想要完成本题的基础是了解栈和队列的基础操作，栈和队列是什么，有什么不同。那么可以想到他们主要的不同就是入栈/队列和出栈/队列的顺序不同了。那么目标就变成很简单的，用两个栈的之间的转换完成队列的操作，反之亦然。
+### 两个栈实现队列
+做个图的话，可以这么看：
+![](https://jerrymazeyu.oss-cn-shanghai.aliyuncs.com/2019-12-20-094541.png)
+我们用stack1和stack2来实现queue，stack1是存放队列中数据的地方，stack2辅助完成pop操作即可。在上图中的情况可以看到，现在我们的pop要求输出1，而现在如果直接是stack的话则就是3，我们的做法是先把stack1中的元素依次移动到stack2中，可以看到stack2中的元素则实现了逆序，此时再pop即可。不过要注意的是，每次用完要把元素在放回stack1中。
+我们现在的思路是修改了pop，其实如果修改push也是可以的，下面的代码就是修改push版本的：  
+
+```python 
+class Stack():
+    def __init__(self):
+        self.list_ = []
+
+    def is_empty(self):
+        return len(self.list_) == 0
+
+    def pop(self):
+        return self.list_.pop()
+
+    def push(self, x):
+        self.list_.append(x)
+
+class Queue():
+    def __init__(self):
+        self.stack1 = Stack()
+        self.stack2 = Stack()
+
+    def is_empty(self):
+        return self.stack1.is_empty()
+
+    def pop(self):
+        return self.stack1.pop()
+
+    def push(self, x):
+        while not self.stack1.is_empty():
+            self.stack2.push(self.stack1.pop())
+        self.stack1.push(x)
+        while not self.stack2.is_empty():
+            self.stack1.push(self.stack2.pop())
+```
+
+### 用两个队列实现栈
+这个比刚才的要难一些，这是因为你可以看到队列的先进先出准则使它无法像栈那样的轻易形成逆序。在下采用的方法是用计数来做，思路也是修改pop函数，只要我知道这个队列中有几个元素，那么第n个元素则是我要pop的那个。  
+举例来说，我现在有一个队列123，现在pop出来的应该是1，而我要让他pop出的是3，那么我先让queue1整体的移动到queue2，在这个过程中我可以计数，知道了有几个元素后，我每次从queue1中拿出一个元素，如果这不是第n次拿出来，我就把它放进queue2中，如果是的话，我就不放，那么最终queue2中的元素就会变成12，这样的话就形成了栈的结构了。  
+代码如下：  
+
+```python
+class StackByQueue():
+    def __init__(self):
+        self.queue1 = Queue()
+        self.queue2 = Queue()
+
+    def is_empty(self):
+        return self.queue1.is_empty()
+
+    def __len__(self):
+        res = 0
+        while not self.queue1.is_empty():
+            res += 1
+            self.queue2.push(self.queue1.pop())
+        self.queue1, self.queue2 = self.queue2, self.queue1
+        return res
+
+    def pop(self):
+        length = len(self)
+        res = 0
+        while not self.queue1.is_empty():
+            res += 1
+            tmp = self.queue1.pop()
+            if res != length:
+                self.queue2.push(tmp)
+        self.queue1, self.queue2 = self.queue2, self.queue1
+        return tmp
+
+
+    def push(self, x):
+        self.queue1.push(x)
+```
+
+## NO8 旋转数组的最小值（二分查找）
+### 查找
+查找和排序是程序设计中非常重要的两个部分，面试中必然会经常考到。手写常见的排序算法并了解它们的复杂度，包括如何去优化他们这是十分重要的。而查找则没有那么复杂，一般不外乎**顺序查找、二分查找、哈希查找和二叉排序树**查找这几种方式。其中哈希查找和二叉排序树查找更多偏向于考察数据结构，例如哈希表的工作原理或者是哈希表冲突的解决方案等，而真正算法相关的就主要是二分查找了。  
+如果面试中遇到了在排序后的数组中查找一个数字或者统计某个数字出现的次数，那么我们可以考虑二分查找的方式。  
+传统的二分查找原理是不断的缩减规模，从而使查找规模逐次减半，这样我们可以知道其时间复杂度为O(log2n)。  
+### 传统二分查找
+最传统的二分查找应用在排序数组中查找某一个元素的位置，代码很简单：  
+
+```python
+def binary_search(tar, lst):
+    cur1 = 0
+    cur2 = len(lst)-1
+    if lst[cur1] == tar:
+        return cur1
+    if lst[cur2] == tar:
+        return cur2
+    while cur1 < cur2:
+        mid = int((cur1+cur2)/2)
+        if lst[mid] < tar:
+            cur1 = mid
+        elif lst[mid] > tar:
+            cur2 = mid
+        else:
+            return mid
+```
+二分查找的套路也很简单，就是先设置两个指针分别指向起点和终点，然后通过引入mid来实现规模的缩减，当然这里的判断是根据问题的不同而不同的，比如在这里我们要看的是tar和lst[mid]之间的关系，而当问题不同的时候，这里的比较可能也不尽相同了。这样不断的进行，就形成了二分查找。  
+### 旋转数组的最小值
+现在我们来看看这道题，**并不是所有的二分查找都需要在排序好的数组中完成**，本题便是提供了一个很好的例子。
+首先，我们说数组{3,4,5,1,2}是数组{1,2,3,4,5}的一个旋转，我们要做的是找到旋转数组中的最小值，注意到旋转之后的数组可以划分成两个排序的子数组，而前面的元素都大于或者等于后面数组的元素。我们还注意到最小的那个数正好是两个数组之间的分界线。  
+我们的想法和二分查找一样，不同的是找到mid后并不是直接查看到底是不是tar，而是要跟两个指针做比较，如果判断mid在前一部分，那么就让前一部分的指针指到mid，而如果mid指向了后面的数组，则让后面的指针指向mid，这样不断的往复，可以想到最终的结果是cur1指向了前一部分的末尾而cur2指向了后一部分的头，而我们要的那一个数字不正是cur2所指的部分嘛？  
+但是这里有一些问题需要去考虑的，就是{10111}或者{11101}这种情况，这时候两个指针都相等，根本没法判断哪里是前和后，这种情况下，我们只能用顺序查找的方法了。  
+上代码如下：  
+
+```python
+def find_min(lst: list):
+    if len(lst)==1:
+        return lst[0]
+    cur1 = 0
+    cur2 = len(lst)-1
+    if lst[cur2] == lst[cur1]:
+        return min(lst)
+    while cur2-cur1 != 1:
+        mid = int((cur2 + cur1)/2)
+        if lst[cur2] > lst[mid]:
+            cur2 = mid
+        elif lst[cur1] < lst[mid]:
+            cur1 = mid
+    return lst[cur2]
+```
+通过这种方式，我们可以看到在半排序的数组中二分查找依然有效，但是我觉得其实最值得把握的是二分查找的思想：让问题规模减小，不断减治。    
+## NO9 矩阵中的路径（回溯法）
+### 回溯法
+回溯法是升级版的暴力法，常常和递归用到一起，一般的情况都可以把问题分解成一个树形的结构，进行深度优先搜索，如果这条路不通，就退回到上一步，然后继续进行。  
+本人感觉其实回溯法的思想并不难易理解，但是代码写起来总感觉不很顺畅。难点主要集中在这几点，首先如何把握递归的出口，其次是如何回退回去，这并没有一个普世的解决方案，只能是满满积累。
+### 题目
+现在有一个矩阵，设计算法找出符合某一个特定字符串的这矩阵中的一条路径。规定可以从任何地点开始，可以上下左右各种走，但是不能走重复的路。  
+例如下图，bfce则是其中的一条路径，我们的函数实现的功能是输入路径和矩阵，返回一条路径：
+
+想要完成这个任务，我们可以把路看成一个树的结构，每次我们都向下走一步，如果发现不行我们就回到上一个状态，走下一个节点，直到走通。路径的存放我们可以把它设计成一个栈，在找出一个符合条件的位置的时候，我们让这个位置入栈，而若是走不通的话，则让这个存放结果的栈弹出位置，但这个位置从此就加入了“黑名单”，我们以后搜索遍不考虑他了。  
+具体实现的话，我把函数分成三个部分，除了主函数之外，我还用了找到头节点和判断能不能走通的两个函数，先上代码看一看：  
+
+```python
+def find_path(path, mat):
+    res = []
+    head = path[0]
+    tmp = find_head(head, mat)
+    for i in tmp:
+        res.append(i)
+        excpt = []
+        while len(res) < len(path):
+            candidate = find_neibour(res[-1], mat, path[len(res)], res+excpt)
+            if not candidate:
+                tmp_1 = res.pop()
+                excpt.append(tmp_1)
+            else:
+                res.append(candidate)
+    return res
+
+
+def find_head(tar, mat):
+    res = []
+    for i in range(mat.shape[0]):
+        for j in range(mat.shape[1]):
+            if tar == mat[i][j]:
+                res.append((i, j))
+    return res
+
+
+def find_neibour(location, mat, tar, excpt):
+    res = []
+    if location[1]-1 >= 0:
+        if mat[location[0], location[1]-1] == tar:
+            res.append((location[0], location[1]-1))
+    if location[0]-1 >= 0:
+        if mat[location[0]-1, location[1]] == tar:
+            res.append((location[0]-1, location[1]))
+    if location[1]+1 <= mat.shape[1]-1:
+        if mat[location[0], location[1]+1] == tar:
+            res.append((location[0], location[1]+1))
+    if location[0]+1 <= mat.shape[0]-1:
+        if mat[location[0]+1, location[1]] == tar:
+            res.append((location[0]+1, location[1]))
+    tmp = [x for x in res if x not in excpt]
+    if len(tmp) != 0:
+        return tmp[0]
+    else:
+        return None
+```
+其中find_head不必多说，自然是找到起始位置的函数，而find_neighbour则是在一定的**约束条件**下寻找符合的点坐标的函数，这个约束用excpt参数表示，这让每次的搜索有了“记忆性”，走过的路就不需要继续走了。而find_path是主函数，他每次从res这个栈中拿出一个元素做路径的搜索，但是搜索过的路径以及被“拉黑”的路径又被传到了find_neighbour的参数中去了。这样往复，直到最后栈中的元素与原始的字符串一样长了，这样标志了路径搜索的完成。  
+## NO9 剪绳子
+有一根绳子，请把绳子剪成m段（m、n都是整数并且大于1），想要直到如何切分才能让每段绳子的长度的乘机达到最大呢？
+这个问题是为了知道动态规划和贪心的想法。这道题对应有这两种解法，分别有不同的想法。首先假设在绳子长为n的时候最大的乘积是f(n)，那么怎么考虑呢？首先考虑第一刀可以切1、2……直到(n-1)，这对应的剩下的长度分别为n-1……1，我们可以想到，**剩下的部分要么就切分，要么就不切分**，而切分的最大值已经知道了，就是f(x)，不切分的时候剩下的就是x。那么只需要比较这两种的一个最大值选一下就可以了。  
+是不是感觉到了递归的味道？但是如果用递归的话，会频繁的计算大量的资源，显然使用动态规划的算法是更优化的，动态规划的要点是**从下往上，每次都把跟后面计算相关的变量存储下来**，这样的话我们就可以每次无需从头开始。对于本题的话，为了考虑全面，首先想一想特殊的情况，如果n是1或者0或者负数怎么办呢，考虑之后就可以完成我们的想法，代码如下：  
+
+```python
+def cut_the_rope(n):
+    if n < 1:
+        return 0
+    elif n == 1 or n == 2:
+        return 1
+    else:
+        res = [0,1,1]
+        for i in range(3, n+1):
+            m = 0
+            for j in range(1, i):
+                tmp = max(j * res[i-j], j * (i-j))
+                if tmp > m:
+                    m = tmp
+            res.append(m)
+    return res[-1]
+```    
+可以看到，这种想法的代价是n方的时间复杂度和n的空间复杂度，这并不优秀。有没有更优秀的解法？有的，贪心策略就可以解决这种问题，我们执行的策略只有一个：**大于等于5的时候尽可能的剪3，等于4的时候不剪，等于3的时候为2，2的时候为1**。为什么可以这样想呢？首先我们可以证明在n>5的时候，3(n-3)>n，且3(n-3)>2(n-2)，这说明剪了3之后会更大，且我们要更多的切长度为3的绳子。  
+
+```python
+def greedy_cut_the_rope(n):
+    if n >= 5:
+        x = math.floor(n/3)
+        return math.pow(3, x) * (n-3*x)
+    if n <= 4:
+        res = [0,1,1,2,4]
+        return res[n]
+```
+可以看到，这更快了。  
+## NO10 位运算
+位运算是把数字用二进制表示之后，对每一位上0或者1的运算。其中主要的运算有与运算、或运算、异或运算、左移和右移这五种运算。  
+位运算个人觉得还是要多掌握技巧，其中比较重要的两条我认为是：  
+
+* 左移和右移代表乘法和除法，但是分别都是2的n次幂的乘除。
+* 把一个整数减去1后再和原来的整数做位与运算，得到的结果相当于把整数的二进制表示中最右边的1变成了0。  
+
+那么我们可以看一下这例题：
+### 二进制中1的个数
+查看一个数的二进制后的1的个数。
+同理，还有两道类似的例题，分别是：  
+
+* 查看一个数是不是2的整数次方。
+* 输入两个整数m和n，计算需要改变m的二进制表示中的多少位才能得到n。  
+
+这本例题和上述两道题都可以用位运算的技巧二去解决。  
+如果一个数是2的整数次方的话，那么他的二进制数表示中只有一位是1。而第二题我们可以用m和n做异或运算，这样不同的数位就是1，就变成了二进制中1的个数的问题了。  
+最后，我们简单的解决一下二进制中1的个数的问题好了，贼简单： 
+ 
+```python
+def find_one_in_bin(n):
+    res = 0
+    while n != 0:
+        n = n & (n-1)
+        res += 1
+    return res
+```
+总结一下，我们可以看到在题目出现二进制或者是2的整数幂这种问题上，我们需要多考虑位运算。    
+
+ 
