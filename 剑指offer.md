@@ -556,6 +556,140 @@ def find_one_in_bin(n):
         res += 1
     return res
 ```
-总结一下，我们可以看到在题目出现二进制或者是2的整数幂这种问题上，我们需要多考虑位运算。    
+总结一下，我们可以看到在题目出现二进制或者是2的整数幂这种问题上，我们需要多考虑位运算。
 
+## NO11 协程与线程实现生产-消费模型
+### 什么是生产-消费模型？
+生产者和消费者共享一个缓冲区，当缓冲区生产满足一部分后，消费者开始消耗，是一个并发问题。可以利用线程和协程解决问题，下面先利用线程写一个完整版，再用协程写一个简化版本。
+### 线程版
+有一个超市，无时无刻的顾客会光顾，每次会买10单位的商品；而每次生产者会生产20单位的商品，这个超市最大的容量是100单位的物品，一旦到了生产者就不再生产。接下去要做的就是模拟这个过程，为了实现这个过程，我们需要利用**[threading模块](https://blog.csdn.net/briblue/article/details/85101144)**：
+
+```python
+import threading
+import time
+
+class Producer(threading.Thread):
+    def __init__(self):
+        super(Producer, self).__init__()
+        self.name = 'PRODUCER'
+
+    def run(self):
+        global good, lock  # 一个是全局变量good，一个是线程锁
+        while True:
+            if good < 81:
+                lock.acquire()  # 获取线程锁，保证生产的时候和销售的时候不会冲突
+                good += 20
+                print("[Producer] %s is working ... , goods +20, now has %s" % (self.name, good))
+                lock.release()  # 释放锁
+            else:
+                print("[Producer] Goods has full!")
+            time.sleep(3)  # 休息时间
+
+class Consumer(threading.Thread):
+    def __init__(self):
+        super(Consumer, self).__init__()
+        self.name = 'CONSUMER'
+
+    def run(self):
+        global good, lock
+        while True:
+            if good > 30:
+                lock.acquire()
+                good -= 30
+                print("[Producer] %s is working ... , goods -10, now has %s" % (self.name, good))
+                lock.release()
+            else:
+                print("No goods!")
+            time.sleep(2)
+
+
+
+if __name__ == '__main__':
+    good = 0
+    lock = threading.Lock()
+    c = Consumer()
+    p = Producer()
+    p.start()
+    c.start()
+
+```
+### 协程版
+协程，又称微线程，纤程。英文名Coroutine。  
+子程序，或者称为函数，在所有语言中都是层级调用，比如A调用B，B在执行过程中又调用了C，C执行完毕返回，B执行完毕返回，最后是A执行完毕。  
+所以子程序调用是通过栈实现的，一个线程就是执行一个子程序。  
+子程序调用总是一个入口，一次返回，调用顺序是明确的。而协程的调用和子程序不同。
+协程看上去也是子程序，但执行过程中，在子程序内部可中断，然后转而执行别的子程序，在适当的时候再返回来接着执行。
+注意，在一个子程序中中断，去执行其他子程序，不是函数调用，有点类似CPU的中断。比如子程序A、B：  
+
+```python
+def A():
+    print '1'
+    print '2'
+    print '3'
+
+def B():
+    print 'x'
+    print 'y'
+    print 'z'
+```
+假设由协程执行，在执行A的过程中，可以随时中断，去执行B，B也可能在执行过程中中断再去执行A，结果可能是：
+
+```
+1
+2  
+x  
+y  
+3  
+z  
+```
+这看起来有点像多线程，但是协程是在一个线程中完成的，不需要切换线程，这主要的好处就是： 
  
+* 快，不用切换线程，由程序自身控制
+* 没有锁，控制共享资源不加锁，只需要判断状态就好了。  
+
+python里面协程主要根据yield完成：  
+yield是python里面的一个关键字，返回的是一个生成器，生成器有两个属性：```__next__()```和```send()```，在调用有yield的方法时编译器不执行，只有在调用其```__next__()```方法时候才会执行。 
+ 
+```python  
+def consumer():
+    r = ''
+    while True:
+        c = yield r  # consumer负责不停的返回，但是yield相当于返回，每次只返回一次转到producer
+        print('[CONSUMER] consume ... %s' % c)
+
+def producer(c):
+    c.__next__()  # 响应c，此时consumer执行
+    n = 0
+    while n < 5:
+        n += 1
+        print('[PRODUCER] produce ... %s' % n)  # 生产
+        c.send(n)  # 生产后把n传入c
+        print('[PRODUCER] consumed!')  # 表明生成完成
+    c.close()  # 将生成器关闭
+
+if __name__ == '__main__':
+    c = consumer()
+    producer(c)
+```
+**结果：**
+
+```
+[PRODUCER] produce ... 1
+[CONSUMER] consume ... 1
+[PRODUCER] consumed!
+[PRODUCER] produce ... 2
+[CONSUMER] consume ... 2
+[PRODUCER] consumed!
+[PRODUCER] produce ... 3
+[CONSUMER] consume ... 3
+[PRODUCER] consumed!
+[PRODUCER] produce ... 4
+[CONSUMER] consume ... 4
+[PRODUCER] consumed!
+[PRODUCER] produce ... 5
+[CONSUMER] consume ... 5
+[PRODUCER] consumed!
+```
+**程序分析：**  
+**consumer不调用 --> next激活consumer -->  consumer返回空 --> producer生产，传给consumer传入1 -->  consumer消耗1，返回OK --> produce收到OK,继续生产……**
+
